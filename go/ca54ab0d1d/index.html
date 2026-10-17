@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>AR Plastic Surgery - Patient chat list</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: #f1f4f8; color: #1c2b3a; }
+  .head { background: #10243e; color: #fff; padding: 20px 18px 16px; position: sticky; top: 0; z-index: 5; }
+  .head .brand { font-size: 13px; letter-spacing: 2px; color: #c9a227; font-weight: 700; }
+  .head h1 { font-size: 21px; margin-top: 4px; }
+  .head .sub { font-size: 12px; opacity: .65; margin-top: 4px; }
+  .head .remain { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 700;
+                  background: rgba(201,162,39,.18); color: #f3d27a; padding: 4px 12px; border-radius: 20px; }
+  .opts { background: #fff; padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+  .opts label { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+  .opts input { width: 18px; height: 18px; accent-color: #25D366; }
+  .hint { padding: 12px 18px 0; font-size: 12.5px; color: #5b6b7d; }
+  .list { padding: 12px 14px 90px; max-width: 520px; margin: 0 auto; }
+  .card { background: #fff; border-radius: 14px; padding: 14px 14px; margin-bottom: 12px;
+           box-shadow: 0 1px 4px rgba(16,36,62,.08); display: flex; align-items: center; gap: 12px; }
+  .info { flex: 1; min-width: 0; }
+  .name { font-weight: 700; font-size: 16px; }
+  .phone { font-size: 14px; color: #2b6cb0; text-decoration: none; display: inline-block; margin-top: 3px; }
+  .meta { margin-top: 6px; }
+  .chip { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 20px; letter-spacing: .4px; }
+  .chip.new { background: #e6f7ee; color: #0d7a3f; }
+  .chip.review { background: #eef2ff; color: #3b4fd8; }
+  .pdate { font-size: 11px; color: #8a97a5; margin-left: 8px; }
+  .wa { flex: none; width: 56px; height: 56px; border: 0; border-radius: 50%; background: #25D366;
+         display: flex; align-items: center; justify-content: center; cursor: pointer;
+         box-shadow: 0 2px 8px rgba(37,211,102,.45); }
+  .wa:active { transform: scale(.94); }
+  .wa svg { width: 30px; height: 30px; fill: #fff; }
+  .empty { text-align: center; color: #5b6b7d; padding: 40px 20px; font-size: 15px; }
+  .snack { position: fixed; left: 16px; right: 16px; bottom: 18px; max-width: 480px; margin: 0 auto;
+            background: #10243e; color: #fff; border-radius: 12px; padding: 12px 16px;
+            display: none; align-items: center; justify-content: space-between; gap: 10px;
+            box-shadow: 0 4px 16px rgba(0,0,0,.25); z-index: 20; font-size: 14px; }
+  .snack.show { display: flex; }
+  .snack button { background: none; border: 0; color: #f3d27a; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .foot { text-align: center; font-size: 11.5px; color: #8a97a5; padding: 0 20px 26px; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <div class="brand">AR PLASTIC SURGERY</div>
+    <h1>Patient chat list</h1>
+    <div class="sub">Updated 17 Oct, 11:23 AM</div>
+    <span class="remain" id="remain"></span>
+  </div>
+  <div class="opts">
+    <label><input type="checkbox" id="t-ig" checked> Include Instagram link in the message</label>
+    <label><input type="checkbox" id="t-rev" checked> Include Google review link in the message</label>
+  </div>
+  <p class="hint">Tap the green button to open the patient's WhatsApp chat &mdash; the message is ready to send, and the patient leaves this list. Anyone you don't message stays on the list, even the next day.</p>
+  <div class="list" id="list"></div>
+  <div class="snack" id="snack"><span id="snack-txt"></span><button id="undo">Undo</button></div>
+  <p class="foot">List refreshes daily at 2 PM &amp; 8 PM</p>
+<script>
+var IG = "https://www.instagram.com/aradvancedplasticsurgery?obrf=MTFoOG1qcGZobDM5MQ==";
+var REVIEW = "https://g.page/r/CSpszohzLdmSEBM/review";
+var NEW_PATIENTS = [{"phone": "918639881002", "name": "Mrs. Soumya", "disp": "8639881002", "visit": "Review", "date": "2026-10-12"}, {"phone": "918886183003", "name": "Baby. Manvitha", "disp": "8886183003", "visit": "New", "date": "2026-10-12"}, {"phone": "919703535525", "name": "Ms. Syeda Zeba", "disp": "9703535525", "visit": "New", "date": "2026-10-12"}, {"phone": "919885803992", "name": "Mr. Afroz", "disp": "9885803992", "visit": "New", "date": "2026-10-12"}, {"phone": "917013943509", "name": "Mrs. Nagamani", "disp": "7013943509", "visit": "New", "date": "2026-10-12"}, {"phone": "919908084009", "name": "Mr. Venkatesh", "disp": "9908084009", "visit": "New", "date": "2026-10-12"}, {"phone": "919000703254", "name": "Mr. Sanjeeev Reddy", "disp": "9000703254", "visit": "Review", "date": "2026-10-12"}, {"phone": "918328318454", "name": "Mr. Srikanth", "disp": "8328318454", "visit": "New", "date": "2026-10-12"}, {"phone": "919866796357", "name": "Mr. Nisar Ahmed", "disp": "9866796357", "visit": "New", "date": "2026-10-12"}, {"phone": "919154749810", "name": "Mr. Vamshi", "disp": "9154749810", "visit": "New", "date": "2026-10-12"}, {"phone": "917286999784", "name": "Mr. Ramprasadh", "disp": "7286999784", "visit": "Review", "date": "2026-10-12"}, {"phone": "917207325836", "name": "Mr. Buchu", "disp": "7207325836", "visit": "New", "date": "2026-10-12"}, {"phone": "917036170737", "name": "Mr. Bucchi Mallaiah", "disp": "7036170737", "visit": "New", "date": "2026-10-12"}, {"phone": "917093918524", "name": "Mr. Mytri", "disp": "7093918524", "visit": "Review", "date": "2026-10-13"}, {"phone": "919014822282", "name": "Mr. Srivardhan", "disp": "9014822282", "visit": "Review", "date": "2026-10-13"}, {"phone": "918186860587", "name": "Ms. Vajra", "disp": "8186860587", "visit": "New", "date": "2026-10-13"}, {"phone": "919440321325", "name": "Mrs. Nagarajamma", "disp": "9440321325", "visit": "Review", "date": "2026-10-13"}, {"phone": "917013068919", "name": "Mrs. Meghana", "disp": "7013068919", "visit": "New", "date": "2026-10-13"}, {"phone": "919700465822", "name": "Mrs. Nandhini", "disp": "9700465822", "visit": "Review", "date": "2026-10-13"}, {"phone": "917989612895", "name": "Baby. Snikitha", "disp": "7989612895", "visit": "New", "date": "2026-10-13"}, {"phone": "919963727159", "name": "Mr. Abhinav", "disp": "9963727159", "visit": "New", "date": "2026-10-14"}, {"phone": "919849548766", "name": "Mrs. Padhmaja", "disp": "9849548766", "visit": "Review", "date": "2026-10-14"}, {"phone": "918977937329", "name": "Mr. Gundaiah", "disp": "8977937329", "visit": "Review", "date": "2026-10-14"}, {"phone": "919441853481", "name": "Mr. Nihira", "disp": "9441853481", "visit": "Review", "date": "2026-10-14"}, {"phone": "919866497299", "name": "Mr. Mallaiah", "disp": "9866497299", "visit": "New", "date": "2026-10-15"}, {"phone": "919491562032", "name": "Mr. Tahniath Fathima", "disp": "9491562032", "visit": "New", "date": "2026-10-15"}, {"phone": "919700160016", "name": "Mrs. Afreen", "disp": "9700160016", "visit": "New", "date": "2026-10-15"}, {"phone": "919493336830", "name": "Mr. Mallaiah", "disp": "9493336830", "visit": "Review", "date": "2026-10-15"}, {"phone": "918341247612", "name": "Mr. Hemanth", "disp": "8341247612", "visit": "New", "date": "2026-10-15"}, {"phone": "917396577152", "name": "Mr. Shaik Shamshoddin", "disp": "7396577152", "visit": "New", "date": "2026-10-16"}, {"phone": "919000601319", "name": "Mrs. Saheen Sulthana", "disp": "9000601319", "visit": "Review", "date": "2026-10-16"}, {"phone": "918977303909", "name": "Ms. Viveka", "disp": "8977303909", "visit": "New", "date": "2026-10-16"}];
+var WA_SVG = "<svg viewBox=\"0 0 24 24\"><path d=\"M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.6-6.1c-.3-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4 0-.5.1-.7l.4-.5c.1-.2.1-.3 0-.5L9.1 8.2c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.2-.7.5-.9 1-.6 2.4.6 3.9a11.6 11.6 0 0 0 4.5 4c1.7.8 2.4.9 3.2.7.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2 0-.1-.2-.2-.4-.3z\"/></svg>";
+var PKEY = "ar-pending-v1", SKEY = "ar-sent-v1";
+function load(k) { try { return JSON.parse(localStorage.getItem(k) || "[]"); } catch (e) { return []; } }
+function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function pkey(p) { return p.phone + "|" + p.date; }
+function buildMsg(name) {
+  var t = "Hello " + name + ", thank you for choosing AR Plastic Surgery! We hope you had a good experience at the clinic.";
+  if (document.getElementById("t-ig").checked) t += " Follow our work on Instagram: " + IG;
+  if (document.getElementById("t-rev").checked) t += " If you were happy with your visit, we would appreciate a Google review: " + REVIEW;
+  return t;
+}
+var MON = {"01":"Jan","02":"Feb","03":"Mar","04":"Apr","05":"May","06":"Jun",
+            "07":"Jul","08":"Aug","09":"Sep","10":"Oct","11":"Nov","12":"Dec"};
+function fmtDate(d) { var a = d.split("-"); return (+a[2]) + " " + MON[a[1]]; }
+function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+  .replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+var pending = load(PKEY), sent = load(SKEY), lastRemoved = null, snackTimer = null;
+NEW_PATIENTS.forEach(function (p) {
+  var k = pkey(p);
+  if (sent.indexOf(k) >= 0) return;
+  if (pending.some(function (x) { return pkey(x) === k; })) return;
+  pending.push(p);
+});
+save(PKEY, pending);
+function updateCount() {
+  var n = pending.length;
+  document.getElementById("remain").textContent =
+    n === 0 ? "All done." : n + (n === 1 ? " patient" : " patients") + " to message";
+}
+function cardHTML(p) {
+  var k = pkey(p);
+  var chip = p.visit.toLowerCase() === "review"
+    ? '<span class="chip review">Review</span>' : '<span class="chip new">New</span>';
+  return '<div class="card" data-k="' + esc(k) + '"><div class="info">' +
+    '<div class="name">' + esc(p.name) + '</div>' +
+    '<a class="phone" href="tel:+' + esc(p.phone) + '">' + esc(p.disp) + '</a><br>' +
+    '<div class="meta">' + chip + '<span class="pdate">' + esc(fmtDate(p.date)) + '</span></div>' +
+    '</div><button class="wa" data-k="' + esc(k) + '" aria-label="Chat on WhatsApp">' + WA_SVG + '</button></div>';
+}
+function render() {
+  var list = document.getElementById("list");
+  var ps = pending.slice().sort(function (a, b) {
+    return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0);
+  });
+  list.innerHTML = ps.length
+    ? ps.map(cardHTML).join("")
+    : '<div class="empty">No patients waiting for a message.</div>';
+  updateCount();
+  list.querySelectorAll(".wa").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var k = b.getAttribute("data-k");
+      var p = pending.filter(function (x) { return pkey(x) === k; })[0];
+      if (!p) return;
+      window.open("https://wa.me/" + p.phone + "?text=" +
+        encodeURIComponent(buildMsg(p.name)), "_blank");
+      lastRemoved = p;
+      sent.push(k); save(SKEY, sent);
+      pending = pending.filter(function (x) { return pkey(x) !== k; }); save(PKEY, pending);
+      var card = list.querySelector('.card[data-k="' + k + '"]');
+      var done = function () { render(); };
+      if (card) {
+        card.style.transition = "opacity .3s, transform .3s";
+        card.style.opacity = "0"; card.style.transform = "translateX(40px)";
+        setTimeout(done, 320);
+      } else done();
+      document.getElementById("snack-txt").textContent = "Messaged " + p.name;
+      document.getElementById("snack").classList.add("show");
+      clearTimeout(snackTimer);
+      snackTimer = setTimeout(function () {
+        document.getElementById("snack").classList.remove("show");
+      }, 8000);
+    });
+  });
+}
+document.getElementById("undo").addEventListener("click", function () {
+  if (!lastRemoved) return;
+  var k = pkey(lastRemoved);
+  sent = sent.filter(function (x) { return x !== k; }); save(SKEY, sent);
+  pending.push(lastRemoved); save(PKEY, pending);
+  lastRemoved = null;
+  document.getElementById("snack").classList.remove("show");
+  render();
+});
+render();
+</script>
+</body>
+</html>
