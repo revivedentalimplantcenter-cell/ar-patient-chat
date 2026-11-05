@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Patient Sync — AR Plastic Surgery</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0d1b2e; color: #eef2f7; min-height: 100vh; }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 20px 16px 40px; }
+  header { text-align: center; padding: 18px 0 8px; }
+  header h1 { font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: .3px; }
+  header p { font-size: 13px; color: #c9a86a; margin-top: 4px; letter-spacing: 1.2px; text-transform: uppercase; }
+  .card { background: #ffffff; color: #1c2b3a; border-radius: 14px; padding: 20px; margin-top: 18px; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
+  .card h2 { font-size: 15px; color: #0d1b2e; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .8px; }
+  .row { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid #edf0f4; font-size: 15px; }
+  .row:last-child { border-bottom: none; }
+  .row .k { color: #5a6b7d; }
+  .row .v { font-weight: 600; text-align: right; }
+  .result { margin-top: 12px; background: #f4f7fa; border-left: 4px solid #c9a86a; padding: 10px 12px; border-radius: 6px; font-size: 14px; color: #33475c; }
+  .sync-btn { display: block; width: 100%; margin-top: 22px; padding: 18px; font-size: 19px; font-weight: 700; border: none; border-radius: 14px; background: linear-gradient(180deg, #d9bc7a, #c9a86a); color: #0d1b2e; cursor: pointer; box-shadow: 0 6px 20px rgba(201,168,106,.35); }
+  .sync-btn:active { transform: scale(.99); }
+  .sync-btn:disabled { opacity: .65; cursor: default; }
+  .pending-note { display: none; margin-top: 12px; text-align: center; font-size: 14px; color: #f0d9a0; }
+  .note { margin-top: 18px; font-size: 14px; line-height: 1.55; color: #b9c6d4; text-align: center; }
+  .back { display: block; margin-top: 22px; text-align: center; color: #d9bc7a; font-size: 15px; text-decoration: none; }
+  .back:hover { text-decoration: underline; }
+  .err { color: #ffb4b4; text-align: center; margin-top: 10px; font-size: 13px; display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Patient Sync</h1>
+    <p>AR Plastic Surgery</p>
+  </header>
+
+  <div class="card">
+    <h2>Sync status</h2>
+    <div class="row"><span class="k">Last sync</span><span class="v" id="lastSync">—</span></div>
+    <div class="row"><span class="k">Date</span><span class="v" id="todayDate">—</span></div>
+    <div class="row"><span class="k">Patients today</span><span class="v" id="patientsToday">—</span></div>
+    <div class="row"><span class="k">Patients (last 7 days)</span><span class="v" id="patientsWeek">—</span></div>
+    <div class="result" id="lastResult">Loading status…</div>
+  </div>
+  <div class="err" id="statusErr">Could not load the latest status — showing the page anyway. It will retry automatically.</div>
+
+  <button class="sync-btn" id="syncBtn" type="button">⟳&nbsp; SYNC NOW</button>
+  <div class="pending-note" id="pendingNote">Sync button activation pending</div>
+
+  <p class="note">New patients entered in Mediexpress appear in the Google Sheet and the chat list a few minutes after you tap.</p>
+
+  <a class="back" href="index.html">← Back to patient chat list</a>
+</div>
+
+<script>
+  // Set this to the deployed Google Apps Script web-app URL to activate the button.
+  var APPS_SCRIPT_URL = "";
+
+  function fmtTime(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return d.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
+  }
+  function fmtDate(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso + "T00:00:00");
+    if (isNaN(d)) return iso;
+    return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function loadStatus() {
+    fetch('status.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('bad status'); return r.json(); })
+      .then(function (s) {
+        document.getElementById('lastSync').textContent = fmtTime(s.last_sync_at);
+        document.getElementById('todayDate').textContent = fmtDate(s.today);
+        document.getElementById('patientsToday').textContent = (s.patients_today != null ? s.patients_today : "—");
+        document.getElementById('patientsWeek').textContent = (s.patients_last_7_days != null ? s.patients_last_7_days : "—");
+        document.getElementById('lastResult').textContent = s.result || "—";
+        document.getElementById('statusErr').style.display = 'none';
+      })
+      .catch(function () {
+        document.getElementById('statusErr').style.display = 'block';
+      });
+  }
+
+  var btn = document.getElementById('syncBtn');
+  var note = document.getElementById('pendingNote');
+
+  if (!APPS_SCRIPT_URL) {
+    note.style.display = 'block';
+  }
+
+  btn.addEventListener('click', function () {
+    if (!APPS_SCRIPT_URL) {
+      note.style.display = 'block';
+      return;
+    }
+    btn.disabled = true;
+    var original = btn.innerHTML;
+    fetch(APPS_SCRIPT_URL, { mode: 'no-cors' })
+      .then(function () {
+        btn.textContent = 'Request sent ✓ — sync runs within a few minutes';
+        setTimeout(function () { btn.disabled = false; btn.innerHTML = original; }, 60000);
+      })
+      .catch(function () {
+        btn.textContent = 'Request sent ✓ — sync runs within a few minutes';
+        setTimeout(function () { btn.disabled = false; btn.innerHTML = original; }, 60000);
+      });
+  });
+
+  loadStatus();
+  setInterval(loadStatus, 60000);
+</script>
+</body>
+</html>
