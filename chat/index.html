@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#2a0a3a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" href="data:," />
+    <title>Our Chat</title>
+    <style>
+      :root {
+        --pink-1: #ff5e8a;
+        --pink-2: #e0218a;
+        --theirs: rgba(61, 26, 86, 0.88);
+        --panel: rgba(24, 5, 38, 0.62);
+        --field: rgba(255, 255, 255, 0.09);
+        --line: rgba(255, 255, 255, 0.10);
+        --txt-dim: rgba(255, 255, 255, 0.62);
+        --txt-faint: rgba(255, 255, 255, 0.42);
+      }
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #fff;
+        background: linear-gradient(180deg, #2a0a3a 0%, #3d0d4e 34%, #4b1059 58%, #651a63 82%, #7a1e6d 100%);
+        background-attachment: fixed;
+        overflow: hidden;
+      }
+
+      /* ---------- floating hearts backdrop ---------- */
+      #hearts { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+      #hearts svg { position: absolute; fill: rgba(255, 120, 180, 0.10); animation: drift ease-in-out infinite alternate; }
+      #hearts svg.deep { fill: rgba(160, 60, 200, 0.10); }
+      @keyframes drift {
+        from { transform: translateY(0) rotate(-5deg); }
+        to   { transform: translateY(-26px) rotate(6deg); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #hearts svg { animation: none; }
+        * { transition: none !important; }
+      }
+
+      /* ---------- app column ---------- */
+      #app {
+        position: relative; z-index: 1;
+        max-width: 480px; margin: 0 auto;
+        height: 100dvh; display: flex; flex-direction: column;
+      }
+      #app.hidden { display: none; }
+
+      /* ---------- header ---------- */
+      header {
+        display: flex; align-items: center; gap: 12px;
+        padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+        background: var(--panel);
+        backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--line);
+        flex: 0 0 auto;
+      }
+      .avatar {
+        width: 42px; height: 42px; border-radius: 50%; flex: 0 0 auto;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 19px; font-weight: 700; color: #fff;
+        background: linear-gradient(140deg, #3d1a56, #5b2160);
+        border: 2px solid transparent;
+        background-clip: padding-box;
+        box-shadow: 0 0 0 2px var(--pink-2), 0 0 0 4px rgba(255, 94, 138, 0.35);
+      }
+      .who { min-width: 0; }
+      .who .pname { font-size: 17px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .who .status { font-size: 12.5px; color: var(--txt-dim); line-height: 1.25; }
+      .who .status.typing { color: #ff9ec2; }
+
+      /* ---------- messages ---------- */
+      #msgs {
+        flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain;
+        padding: 14px 14px 6px;
+        display: flex; flex-direction: column;
+        scrollbar-width: thin;
+      }
+      .day-chip {
+        align-self: center; margin: 12px 0 10px;
+        font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em;
+        color: rgba(255,255,255,0.85);
+        background: rgba(20, 4, 32, 0.45);
+        padding: 4px 12px; border-radius: 999px;
+      }
+      .day-chip:first-child { margin-top: 2px; }
+      .row { display: flex; flex-direction: column; max-width: 78%; margin-top: 10px; }
+      .row.grouped { margin-top: 3px; }
+      .row.mine { align-self: flex-end; align-items: flex-end; }
+      .row.theirs { align-self: flex-start; align-items: flex-start; }
+      .bubble-wrap { position: relative; max-width: 100%; }
+      .bubble {
+        padding: 9px 13px; border-radius: 22px;
+        font-size: 15.5px; line-height: 1.38; white-space: pre-wrap; word-break: break-word;
+        user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+        cursor: default;
+      }
+      .row.mine .bubble { background: linear-gradient(135deg, var(--pink-1), var(--pink-2)); border-bottom-right-radius: 6px; box-shadow: 0 4px 14px rgba(224, 33, 138, 0.30); }
+      .row.theirs .bubble { background: var(--theirs); border-bottom-left-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }
+      .row.pending .bubble { opacity: 0.65; }
+      .row.failed .bubble { opacity: 0.55; outline: 1px dashed rgba(255,120,120,0.8); cursor: pointer; }
+      .bubble.deleted { font-style: italic; color: var(--txt-dim); background: rgba(40, 14, 60, 0.55); box-shadow: none; border: 1px solid rgba(255,255,255,0.06); }
+      .quote {
+        display: block; margin: 0 0 6px; padding: 6px 9px;
+        border-radius: 12px; font-size: 13px; line-height: 1.3;
+        background: rgba(0, 0, 0, 0.28); border-left: 3px solid rgba(255, 255, 255, 0.55);
+        color: rgba(255, 255, 255, 0.88); cursor: pointer;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+      }
+      .quote b { display: block; font-size: 12px; color: #ffb3cd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .row.theirs .quote b { color: #d9b3ff; }
+      .meta { font-size: 11px; color: var(--txt-faint); margin: 3px 4px 0; display: flex; gap: 6px; align-items: center; }
+      .meta .st-failed { color: #ff9d9d; }
+      .seen-label { font-size: 11px; color: var(--txt-dim); margin: 2px 4px 0; font-weight: 600; }
+      .pill {
+        position: absolute; bottom: -9px; z-index: 2;
+        background: #3d1454; border: 1px solid rgba(255,255,255,0.22);
+        border-radius: 999px; padding: 1px 7px; font-size: 13px; line-height: 1.5;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4); letter-spacing: 1px;
+      }
+      .row.mine .pill { left: -6px; }
+      .row.theirs .pill { right: -6px; }
+      .row.has-pill { margin-bottom: 8px; }
+      .dots {
+        position: absolute; top: 50%; transform: translateY(-50%);
+        width: 28px; height: 28px; border-radius: 50%; border: none;
+        background: rgba(20,4,32,0.55); color: rgba(255,255,255,0.85);
+        font-size: 15px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity .15s;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .row.mine .dots { left: -34px; }
+      .row.theirs .dots { right: -34px; }
+      .row:hover .dots, .dots:focus-visible { opacity: 1; }
+      @media (hover: none) { .dots { display: none; } }
+      .flash .bubble { animation: flashBg 1.2s ease; }
+      @keyframes flashBg { 0%, 60% { filter: brightness(1.7); } 100% { filter: brightness(1); } }
+
+      /* typing indicator */
+      #typing-row { display: none; align-self: flex-start; margin-top: 10px; }
+      #typing-row.on { display: block; }
+      #typing-row .bubble { display: flex; gap: 4px; padding: 12px 14px; }
+      #typing-row .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.75); animation: blink 1.2s infinite; }
+      #typing-row .dot:nth-child(2) { animation-delay: 0.18s; }
+      #typing-row .dot:nth-child(3) { animation-delay: 0.36s; }
+      @keyframes blink { 0%, 60%, 100% { opacity: 0.3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
+
+      #empty-note { text-align: center; color: var(--txt-dim); font-size: 14px; margin: auto 24px; line-height: 1.6; }
+      #empty-note .big { font-size: 40px; display: block; margin-bottom: 8px; }
+
+      /* ---------- reply preview + composer ---------- */
+      #reply-bar {
+        display: none; align-items: center; gap: 10px;
+        margin: 0 12px; padding: 8px 12px;
+        background: rgba(20, 4, 32, 0.72); border: 1px solid var(--line); border-bottom: none;
+        border-radius: 14px 14px 0 0; font-size: 13px;
+      }
+      #reply-bar.on { display: flex; }
+      #reply-bar .rb-text { flex: 1; min-width: 0; }
+      #reply-bar .rb-name { font-weight: 700; color: #ff9ec2; font-size: 12.5px; }
+      #reply-bar .rb-body { color: var(--txt-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #reply-bar button { background: none; border: none; color: #fff; font-size: 16px; cursor: pointer; padding: 4px; }
+      #composer-zone {
+        flex: 0 0 auto; position: relative;
+        padding: 8px 12px calc(10px + env(safe-area-inset-bottom));
+        background: var(--panel);
+        backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+        border-top: 1px solid var(--line);
+      }
+      #reply-bar.on + #composer-zone, #composer-zone.attached { border-top: none; border-radius: 0; }
+      #composer { display: flex; align-items: flex-end; gap: 8px; }
+      .field {
+        flex: 1; display: flex; align-items: flex-end;
+        background: var(--field); border: 1px solid var(--line);
+        border-radius: 24px; padding: 4px 6px 4px 16px; min-height: 44px;
+      }
+      #input {
+        flex: 1; border: none; outline: none; background: transparent; color: #fff;
+        font-size: 16px; font-family: inherit; line-height: 1.35;
+        resize: none; max-height: 110px; padding: 8px 0;
+      }
+      #input::placeholder { color: var(--txt-faint); }
+      .icon-btn {
+        width: 38px; height: 38px; border-radius: 50%; border: none; flex: 0 0 auto;
+        background: transparent; color: #ffb3cd; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; padding: 0;
+      }
+      .icon-btn svg { width: 24px; height: 24px; fill: currentColor; }
+      #send-btn {
+        width: 44px; height: 44px; border-radius: 50%; border: none; flex: 0 0 auto;
+        background: linear-gradient(135deg, var(--pink-1), var(--pink-2));
+        color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 4px 14px rgba(224, 33, 138, 0.45);
+      }
+      #send-btn svg { width: 21px; height: 21px; fill: #fff; margin-left: 2px; }
+      #send-btn:active { transform: scale(0.94); }
+
+      #emoji-panel {
+        display: none; padding: 10px 4px 2px;
+        grid-template-columns: repeat(8, 1fr); gap: 2px;
+      }
+      #emoji-panel.on { display: grid; }
+      #emoji-panel button {
+        background: none; border: none; font-size: 24px; padding: 6px 0; cursor: pointer; border-radius: 10px;
+      }
+      #emoji-panel button:active { background: rgba(255,255,255,0.12); }
+
+      /* ---------- action sheet ---------- */
+      #sheet-veil {
+        position: fixed; inset: 0; z-index: 40; background: rgba(10, 2, 18, 0.55);
+        opacity: 0; pointer-events: none; transition: opacity .2s;
+      }
+      #sheet-veil.on { opacity: 1; pointer-events: auto; }
+      #sheet {
+        position: fixed; left: 50%; bottom: 0; z-index: 41;
+        width: min(480px, 100%); transform: translate(-50%, 105%);
+        transition: transform .24s cubic-bezier(.3,.9,.3,1);
+        background: #2c0c40; border-radius: 22px 22px 0 0;
+        border-top: 1px solid rgba(255,255,255,0.14);
+        padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+        display: none;
+      }
+      #sheet.shown { display: block; }
+      #sheet.on { transform: translate(-50%, 0); }
+      #sheet .react-row { display: flex; justify-content: space-between; padding: 2px 2px 12px; border-bottom: 1px solid var(--line); }
+      #sheet .react-row button {
+        background: rgba(255,255,255,0.07); border: none; border-radius: 50%;
+        width: 46px; height: 46px; font-size: 23px; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+      }
+      #sheet .react-row button:active { transform: scale(1.2); background: rgba(255,255,255,0.16); }
+      #sheet .act {
+        display: flex; align-items: center; gap: 12px; width: 100%;
+        background: none; border: none; color: #fff; font-size: 16px; font-family: inherit;
+        padding: 14px 6px; cursor: pointer; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05);
+      }
+      #sheet .act:last-child { border-bottom: none; }
+      #sheet .act.danger { color: #ff8f8f; }
+      #sheet .act svg { width: 20px; height: 20px; fill: currentColor; flex: 0 0 auto; }
+
+      /* ---------- gate & name screens ---------- */
+      .screen {
+        position: fixed; inset: 0; z-index: 60;
+        display: flex; align-items: center; justify-content: center;
+        padding: 24px;
+        background: linear-gradient(180deg, #2a0a3a 0%, #4b1059 55%, #7a1e6d 100%);
+      }
+      .screen.hidden { display: none; }
+      .card { width: min(360px, 100%); text-align: center; position: relative; z-index: 1; }
+      .card .heart-badge {
+        width: 84px; height: 84px; margin: 0 auto 18px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--pink-1), var(--pink-2));
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 10px 30px rgba(224, 33, 138, 0.5);
+      }
+      .card .heart-badge svg { width: 42px; height: 42px; fill: #fff; }
+      .card h1 { font-size: 27px; margin: 0 0 6px; font-weight: 800; letter-spacing: 0.01em; }
+      .card p { color: var(--txt-dim); font-size: 14.5px; margin: 0 0 24px; line-height: 1.5; }
+      .card input {
+        width: 100%; border: 1px solid var(--line); outline: none;
+        background: rgba(255,255,255,0.08); color: #fff;
+        border-radius: 16px; padding: 15px 16px; font-size: 16px; font-family: inherit;
+        text-align: center; margin-bottom: 14px;
+      }
+      #gate-code { font-size: 26px; letter-spacing: 14px; font-weight: 700; padding-left: 30px; }
+      #gate-code::placeholder { letter-spacing: 14px; font-size: 22px; color: var(--txt-faint); }
+      .card input:focus { border-color: var(--pink-1); background: rgba(255,255,255,0.12); }
+      .card .primary {
+        width: 100%; border: none; cursor: pointer; color: #fff;
+        background: linear-gradient(135deg, var(--pink-1), var(--pink-2));
+        font-size: 16.5px; font-weight: 700; font-family: inherit;
+        padding: 15px; border-radius: 16px;
+        box-shadow: 0 8px 22px rgba(224, 33, 138, 0.4);
+      }
+      .card .primary:active { transform: scale(0.98); }
+      .card .primary:disabled { opacity: 0.55; }
+      .err { color: #ff9d9d; font-size: 13.5px; min-height: 20px; margin-top: 12px; }
+      .shake { animation: shake 0.45s ease; }
+      @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-9px); } 40% { transform: translateX(9px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(6px); } }
+    </style>
+  </head>
+  <body>
+    <div id="hearts" aria-hidden="true"></div>
+
+    <!-- ============ CHAT SCREEN ============ -->
+    <div id="app" class="hidden">
+      <header>
+        <div class="avatar" id="avatar">♥</div>
+        <div class="who">
+          <div class="pname" id="partner-name">Our Chat</div>
+          <div class="status" id="partner-status">&nbsp;</div>
+        </div>
+      </header>
+
+      <div id="msgs">
+        <div id="empty-note"><span class="big">💜</span>No messages yet.<br />Say hello — your whole conversation is saved here.</div>
+        <div id="typing-row"><div class="bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
+      </div>
+
+      <div id="reply-bar">
+        <div class="rb-text">
+          <div class="rb-name" id="rb-name"></div>
+          <div class="rb-body" id="rb-body"></div>
+        </div>
+        <button id="rb-close" aria-label="Cancel reply">✕</button>
+      </div>
+
+      <div id="composer-zone">
+        <div id="emoji-panel" aria-label="Emoji panel"></div>
+        <div id="composer">
+          <div class="field">
+            <textarea id="input" rows="1" placeholder="Message…" autocomplete="off"></textarea>
+            <button class="icon-btn" id="emoji-btn" aria-label="Emoji">
+              <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-3.2 6.2a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2zm6.4 0a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2zM12 17.6c-2 0-3.7-1.2-4.5-3h9c-.8 1.8-2.5 3-4.5 3z"/></svg>
+            </button>
+          </div>
+          <button id="send-btn" aria-label="Send">
+            <svg viewBox="0 0 24 24"><path d="M2.4 20.9 23 12 2.4 3.1l-.01 6.96L17 12 2.39 13.94z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ ACTION SHEET ============ -->
+    <div id="sheet-veil"></div>
+    <div id="sheet" role="dialog" aria-label="Message options">
+      <div class="react-row" id="react-row"></div>
+      <button class="act" id="act-reply">
+        <svg viewBox="0 0 24 24"><path d="M10 8V5L3 12l7 7v-3.1c4.6 0 7.7 1.6 10 4.9-.8-7.3-4.4-11.9-10-12.8z"/></svg>
+        Reply
+      </button>
+      <button class="act" id="act-copy">
+        <svg viewBox="0 0 24 24"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg>
+        Copy
+      </button>
+      <button class="act danger" id="act-delete">
+        <svg viewBox="0 0 24 24"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        Delete
+      </button>
+    </div>
+
+    <!-- ============ NAME SCREEN ============ -->
+    <div class="screen hidden" id="name-screen">
+      <div class="card">
+        <div class="heart-badge"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
+        <h1>One more thing</h1>
+        <p>What name should appear on your messages? Your partner sees this name in the chat.</p>
+        <input id="name-input" type="text" placeholder="Your name" maxlength="30" autocomplete="name" />
+        <button class="primary" id="name-go">Start chatting</button>
+        <div class="err" id="name-err"></div>
+      </div>
+    </div>
+
+    <!-- ============ PASSCODE GATE ============ -->
+    <div class="screen" id="gate-screen">
+      <div class="card" id="gate-card">
+        <div class="heart-badge"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
+        <h1>Our Chat</h1>
+        <p>A private place, just for two.<br />Enter your 4-digit passcode to come in.</p>
+        <input id="gate-code" type="password" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="••••" />
+        <button class="primary" id="gate-go">Unlock</button>
+        <div class="err" id="gate-err"></div>
+      </div>
+    </div>
+
+    <script>
+      'use strict';
+      var BACKEND = 'https://script.google.com/macros/s/AKfycbzdLRmGh3STDAVa-jfc6mdjgCNoLyzEHsfBZzhrw6zq2GGYYYMWYTgyghEZrJCQUL6Zbw/exec';
+      var EMOJIS_QUICK = ['❤️', '😂', '😮', '👍', '🙏', '🔥'];
+      var EMOJIS_PANEL = ['❤️','😂','😍','🥰','😘','😊','😉','😎','🤗','😢','😭','😮','😴','🤔','👍','👎','🙏','👏','🔥','💯','🎉','💜','💕','💖','🌹','☀️','🌙','⭐','🍕','☕','🎂','🎁'];
+
+      var $ = function (id) { return document.getElementById(id); };
+      var msgsEl = $('msgs'), inputEl = $('input');
+
+      var S = {
+        code: localStorage.getItem('ourchat_code') || '',
+        name: localStorage.getItem('ourchat_name') || '',
+        since: 0,
+        messages: new Map(),   // id -> msg object
+        rows: new Map(),       // id -> row element
+        pending: new Map(),    // tempId -> {text, replyto}
+        tempSeq: 0,
+        other: {},
+        replyTo: null,
+        sheetTarget: null,
+        lastDay: '',
+        lastSender: null,
+        started: false,
+        typingSentAt: 0,
+        typingIdleTimer: null,
+        isTyping: false,
+        lastSeenSent: -1,
+        lastStateAt: 0,
+        partnerName: ''
+      };
+
+      /* ---------------- hearts backdrop ---------------- */
+      (function hearts() {
+        var box = $('hearts');
+        var path = 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z';
+        var spots = [[4,6,54],[86,4,38],[70,16,70],[16,30,34],[92,38,48],[6,58,64],[80,62,30],[30,78,44],[58,88,58],[44,8,28],[96,80,40],[22,92,30],[52,44,24],[12,80,26],[66,30,22]];
+        spots.forEach(function (s, i) {
+          var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('viewBox', '0 0 24 24');
+          svg.style.left = s[0] + '%'; svg.style.top = s[1] + '%';
+          svg.style.width = s[2] + 'px'; svg.style.height = s[2] + 'px';
+          svg.style.animationDuration = (5 + (i % 5) * 1.6) + 's';
+          if (i % 3 === 1) svg.setAttribute('class', 'deep');
+          var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          p.setAttribute('d', path);
+          svg.appendChild(p);
+          box.appendChild(svg);
+        });
+      })();
+
+      /* ---------------- JSONP API ---------------- */
+      var cbSeq = 0;
+      function api(params) {
+        return new Promise(function (resolve, reject) {
+          var cb = '__oc' + (++cbSeq) + '_' + Date.now();
+          var script = document.createElement('script');
+          var done = false;
+          var timer = setTimeout(function () { cleanup(); reject(new Error('timeout')); }, 20000);
+          function cleanup() {
+            if (done) return; done = true;
+            clearTimeout(timer);
+            try { delete window[cb]; } catch (e) { window[cb] = undefined; }
+            if (script.parentNode) script.parentNode.removeChild(script);
+          }
+          window[cb] = function (data) { cleanup(); resolve(data); };
+          script.onerror = function () { cleanup(); reject(new Error('network')); };
+          var q = new URLSearchParams();
+          Object.keys(params).forEach(function (k) { q.set(k, params[k]); });
+          q.set('code', S.code);
+          q.set('callback', cb);
+          script.src = BACKEND + '?' + q.toString();
+          document.head.appendChild(script);
+        });
+      }
+
+      /* ---------------- helpers ---------------- */
+      function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+      function fmtTime(ts) {
+        var d = new Date(ts);
+        var h = d.getHours(), m = d.getMinutes();
+        var ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12;
+        return h + ':' + (m < 10 ? '0' : '') + m + ' ' + ap;
+      }
+      function dayKey(ts) { var d = new Date(ts); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); }
+      function dayLabel(ts) {
+        var now = new Date(), d = new Date(ts);
+        if (dayKey(ts) === dayKey(now.getTime())) return 'Today';
+        if (dayKey(ts) === dayKey(now.getTime() - 864e5)) return 'Yesterday';
+        return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+      }
+      function agoText(ts) {
+        var s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+        if (s < 60) return 'just now';
+        var m = Math.floor(s / 60); if (m < 60) return m + 'm ago';
+        var h = Math.floor(m / 60); if (h < 24) return h + 'h ago';
+        var d = Math.floor(h / 24); if (d < 7) return d + 'd ago';
+        return new Date(ts).toLocaleDateString([], { day: 'numeric', month: 'short' });
+      }
+      function nearBottom() { return msgsEl.scrollHeight - msgsEl.scrollTop - msgsEl.clientHeight < 140; }
+      function scrollBottom() { msgsEl.scrollTop = msgsEl.scrollHeight; }
+
+      /* ---------------- rendering ---------------- */
+      function maybeDayChip(ts) {
+        var k = dayKey(ts);
+        if (k !== S.lastDay) {
+          S.lastDay = k; S.lastSender = null;
+          var chip = document.createElement('div');
+          chip.className = 'day-chip'; chip.textContent = dayLabel(ts);
+          msgsEl.insertBefore(chip, $('typing-row'));
+        }
+      }
+      function reactionEmojis(reactions) {
+        var seen = [], vals = Object.values(reactions || {});
+        vals.forEach(function (e) { if (seen.indexOf(e) === -1) seen.push(e); });
+        return seen;
+      }
+      function buildRow(msg) {
+        var mine = msg.name === S.name;
+        var row = document.createElement('div');
+        row.className = 'row ' + (mine ? 'mine' : 'theirs') + (S.lastSender === msg.name ? ' grouped' : '');
+        row.dataset.id = msg.id;
+        S.lastSender = msg.name;
+
+        var wrap = document.createElement('div');
+        wrap.className = 'bubble-wrap';
+
+        var bubble = document.createElement('div');
+        bubble.className = 'bubble' + (msg.deleted ? ' deleted' : '');
+        if (msg.deleted) {
+          bubble.textContent = 'This message was deleted';
+        } else {
+          if (msg.replyto !== '' && msg.replyto != null && Number(msg.replyto) > 0) {
+            var target = S.messages.get(Number(msg.replyto));
+            var q = document.createElement('span');
+            q.className = 'quote';
+            q.dataset.target = msg.replyto;
+            if (target) {
+              q.innerHTML = '<b>' + esc(target.name === S.name ? 'You' : target.name) + '</b>' +
+                esc(target.deleted ? 'This message was deleted' : String(target.text).slice(0, 80));
+            } else {
+              q.innerHTML = '<b>Original message</b>';
+            }
+            bubble.appendChild(q);
+          }
+          bubble.appendChild(document.createTextNode(msg.text));
+        }
+        wrap.appendChild(bubble);
+
+        if (!msg.deleted) {
+          var dots = document.createElement('button');
+          dots.className = 'dots'; dots.textContent = '⋯'; dots.setAttribute('aria-label', 'Message options');
+          dots.addEventListener('click', function (e) { e.stopPropagation(); openSheet(msg.id); });
+          wrap.appendChild(dots);
+        }
+        row.appendChild(wrap);
+
+        var meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.innerHTML = '<span>' + fmtTime(msg.ts) + '</span>' +
+          (msg.pending ? '<span>Sending…</span>' : '') +
+          (msg.failed ? '<span class="st-failed">Failed — tap bubble to retry</span>' : '');
+        row.appendChild(meta);
+        if (msg.pending) row.classList.add('pending');
+        if (msg.failed) row.classList.add('failed');
+
+        attachGestures(row, bubble, msg);
+        updatePill(row, msg);
+        return row;
+      }
+      function updatePill(row, msg) {
+        var wrap = row.querySelector('.bubble-wrap');
+        var old = wrap.querySelector('.pill');
+        if (old) old.remove();
+        row.classList.remove('has-pill');
+        if (msg.deleted) return;
+        var ems = reactionEmojis(msg.reactions);
+        if (!ems.length) return;
+        var pill = document.createElement('div');
+        pill.className = 'pill';
+        pill.textContent = ems.join('');
+        wrap.appendChild(pill);
+        row.classList.add('has-pill');
+      }
+      function addMessage(msg, stick) {
+        $('empty-note').style.display = 'none';
+        maybeDayChip(msg.ts);
+        S.messages.set(msg.id, msg);
+        var row = buildRow(msg);
+        S.rows.set(msg.id, row);
+        msgsEl.insertBefore(row, $('typing-row'));
+        if (stick) scrollBottom();
+      }
+      function applyUpdate(u) {
+        var msg = S.messages.get(u.id);
+        var row = S.rows.get(u.id);
+        if (!msg || !row) return;
+        msg.reactions = u.reactions || {};
+        if (u.deleted && !msg.deleted) {
+          msg.deleted = true;
+          var bubble = row.querySelector('.bubble');
+          bubble.className = 'bubble deleted';
+          bubble.textContent = 'This message was deleted';
+          var dots = row.querySelector('.dots');
+          if (dots) dots.remove();
+        }
+        updatePill(row, msg);
+      }
+      function refreshSeen() {
+        var old = msgsEl.querySelector('.seen-label');
+        if (old) old.remove();
+        var seenUpto = Number(S.other.seen_upto || 0);
+        if (!seenUpto) return;
+        var myIds = [];
+        S.messages.forEach(function (m) { if (m.name === S.name && m.id > 0) myIds.push(m.id); });
+        if (!myIds.length) return;
+        var latest = Math.max.apply(null, myIds);
+        if (seenUpto >= latest) {
+          var row = S.rows.get(latest);
+          if (row) {
+            var lab = document.createElement('div');
+            lab.className = 'seen-label'; lab.textContent = 'Seen';
+            row.appendChild(lab);
+          }
+        }
+      }
+      function refreshHeader() {
+        var o = S.other || {};
+        if (o.name && o.name !== S.partnerName) {
+          S.partnerName = o.name;
+          $('partner-name').textContent = o.name;
+          $('avatar').textContent = o.name.charAt(0).toUpperCase();
+        }
+        var st = $('partner-status');
+        if (o.typing) { st.textContent = 'typing…'; st.classList.add('typing'); return; }
+        st.classList.remove('typing');
+        if (!o.name) { st.innerHTML = '&nbsp;'; return; }
+        var la = Number(o.last_active || 0);
+        if (la && Date.now() - la < 60000) st.textContent = 'Active now';
+        else if (la) st.textContent = 'Active ' + agoText(la);
+        else st.textContent = '';
+      }
+
+      /* ---------------- gestures: long-press, double-tap ---------------- */
+      function attachGestures(row, bubble, msg) {
+        var pressTimer = null, lastTap = 0, longFired = false;
+        bubble.addEventListener('pointerdown', function () {
+          longFired = false;
+          if (msg.deleted) return;
+          pressTimer = setTimeout(function () { longFired = true; openSheet(msg.id); }, 480);
+        });
+        ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
+          bubble.addEventListener(ev, function () { if (pressTimer) clearTimeout(pressTimer); });
+        });
+        bubble.addEventListener('contextmenu', function (e) {
+          e.preventDefault();
+          if (!msg.deleted) openSheet(msg.id);
+        });
+        bubble.addEventListener('click', function () {
+          if (longFired) { longFired = false; return; }
+          if (msg.failed) { retrySend(msg.id); return; }
+          var now = Date.now();
+          if (now - lastTap < 320 && !msg.deleted) {
+            lastTap = 0;
+            toggleReact(msg.id, '❤️');
+          } else lastTap = now;
+        });
+        bubble.addEventListener('click', function (e) {
+          var q = e.target.closest ? e.target.closest('.quote') : null;
+          if (q && q.dataset.target) {
+            var t = S.rows.get(Number(q.dataset.target));
+            if (t) {
+              t.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              t.classList.remove('flash'); void t.offsetWidth; t.classList.add('flash');
+            }
+          }
+        });
+      }
+
+      /* ---------------- action sheet ---------------- */
+      var reactRow = $('react-row');
+      EMOJIS_QUICK.forEach(function (e) {
+        var b = document.createElement('button');
+        b.textContent = e; b.setAttribute('aria-label', 'React ' + e);
+        b.addEventListener('click', function () {
+          if (S.sheetTarget != null) toggleReact(S.sheetTarget, e);
+          closeSheet();
+        });
+        reactRow.appendChild(b);
+      });
+      var sheetHideTimer = null;
+      function openSheet(id) {
+        var msg = S.messages.get(id);
+        if (!msg || msg.deleted) return;
+        S.sheetTarget = id;
+        $('act-delete').style.display = msg.name === S.name ? 'flex' : 'none';
+        $('sheet-veil').classList.add('on');
+        if (sheetHideTimer) clearTimeout(sheetHideTimer);
+        var sheet = $('sheet');
+        sheet.classList.add('shown');
+        void sheet.offsetWidth; // let the display change apply, then slide up
+        sheet.classList.add('on');
+        if (navigator.vibrate) navigator.vibrate(12);
+      }
+      function closeSheet() {
+        $('sheet-veil').classList.remove('on');
+        var sheet = $('sheet');
+        sheet.classList.remove('on');
+        if (sheetHideTimer) clearTimeout(sheetHideTimer);
+        sheetHideTimer = setTimeout(function () { sheet.classList.remove('shown'); }, 260);
+        S.sheetTarget = null;
+      }
+      $('sheet-veil').addEventListener('click', closeSheet);
+      $('act-reply').addEventListener('click', function () {
+        var msg = S.messages.get(S.sheetTarget);
+        if (msg) setReply(msg);
+        closeSheet();
+        inputEl.focus();
+      });
+      $('act-copy').addEventListener('click', function () {
+        var msg = S.messages.get(S.sheetTarget);
+        closeSheet();
+        if (!msg) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(msg.text).catch(function () {});
+        else {
+          var ta = document.createElement('textarea');
+          ta.value = msg.text; document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          ta.remove();
+        }
+      });
+      $('act-delete').addEventListener('click', function () {
+        var id = S.sheetTarget;
+        closeSheet();
+        if (id == null) return;
+        api({ action: 'del', name: S.name, msgid: id }).catch(function () {});
+        applyUpdate({ id: id, reactions: (S.messages.get(id) || {}).reactions || {}, deleted: true });
+      });
+
+      /* ---------------- reactions ---------------- */
+      function toggleReact(id, emoji) {
+        var msg = S.messages.get(id);
+        if (!msg || msg.deleted) return;
+        msg.reactions = msg.reactions || {};
+        if (msg.reactions[S.name] === emoji) delete msg.reactions[S.name];
+        else msg.reactions[S.name] = emoji;
+        var row = S.rows.get(id);
+        if (row) updatePill(row, msg);
+        api({ action: 'react', name: S.name, msgid: id, emoji: emoji }).catch(function () {});
+      }
+
+      /* ---------------- reply ---------------- */
+      function setReply(msg) {
+        S.replyTo = msg;
+        $('rb-name').textContent = 'Replying to ' + (msg.name === S.name ? 'yourself' : msg.name);
+        $('rb-body').textContent = msg.text;
+        $('reply-bar').classList.add('on');
+        $('composer-zone').classList.add('attached');
+      }
+      function cancelReply() {
+        S.replyTo = null;
+        $('reply-bar').classList.remove('on');
+        $('composer-zone').classList.remove('attached');
+      }
+      $('rb-close').addEventListener('click', cancelReply);
+
+      /* ---------------- send ---------------- */
+      function sendCurrent() {
+        var text = inputEl.value.trim();
+        if (!text) return;
+        var replyto = S.replyTo ? S.replyTo.id : '';
+        inputEl.value = '';
+        autoGrow();
+        cancelReply();
+        stopTyping();
+        doSend(text, replyto);
+      }
+      function doSend(text, replyto) {
+        var tempId = -(++S.tempSeq);
+        var msg = { id: tempId, ts: Date.now(), name: S.name, text: text, replyto: replyto, reactions: {}, deleted: false, pending: true, failed: false };
+        S.pending.set(tempId, { text: text, replyto: replyto });
+        addMessage(msg, true);
+        api({ action: 'send', name: S.name, text: text, replyto: replyto || '' }).then(function (res) {
+          if (res && res.ok && res.id) confirmSent(tempId, Number(res.id));
+          else markFailed(tempId);
+        }).catch(function () { markFailed(tempId); });
+      }
+      function confirmSent(tempId, realId) {
+        var msg = S.messages.get(tempId);
+        var row = S.rows.get(tempId);
+        S.pending.delete(tempId);
+        if (!msg || !row) { if (realId > S.since) S.since = realId; return; }
+        S.messages.delete(tempId); S.rows.delete(tempId);
+        msg.id = realId; msg.pending = false;
+        S.messages.set(realId, msg); S.rows.set(realId, row);
+        row.dataset.id = realId;
+        row.classList.remove('pending');
+        var meta = row.querySelector('.meta');
+        if (meta) meta.innerHTML = '<span>' + fmtTime(msg.ts) + '</span>';
+        if (realId > S.since) S.since = realId;
+        refreshSeen();
+      }
+      function markFailed(tempId) {
+        var msg = S.messages.get(tempId);
+        var row = S.rows.get(tempId);
+        if (!msg || !row) return;
+        msg.pending = false; msg.failed = true;
+        row.classList.remove('pending'); row.classList.add('failed');
+        var meta = row.querySelector('.meta');
+        if (meta) meta.innerHTML = '<span>' + fmtTime(msg.ts) + '</span><span class="st-failed">Failed — tap bubble to retry</span>';
+      }
+      function retrySend(tempId) {
+        var p = S.pending.get(tempId);
+        var msg = S.messages.get(tempId);
+        var row = S.rows.get(tempId);
+        if (!p || !msg || !row) return;
+        msg.failed = false; msg.pending = true;
+        row.classList.remove('failed'); row.classList.add('pending');
+        var meta = row.querySelector('.meta');
+        if (meta) meta.innerHTML = '<span>' + fmtTime(msg.ts) + '</span><span>Sending…</span>';
+        api({ action: 'send', name: S.name, text: p.text, replyto: p.replyto || '' }).then(function (res) {
+          if (res && res.ok && res.id) confirmSent(tempId, Number(res.id));
+          else markFailed(tempId);
+        }).catch(function () { markFailed(tempId); });
+      }
+
+      /* ---------------- typing & seen state ---------------- */
+      function highestPartnerId() {
+        var best = 0;
+        S.messages.forEach(function (m) { if (m.name !== S.name && m.id > best) best = m.id; });
+        return best;
+      }
+      function sendState(typing) {
+        var seen = highestPartnerId();
+        S.lastStateAt = Date.now();
+        if (seen > S.lastSeenSent) S.lastSeenSent = seen;
+        api({ action: 'state', name: S.name, typing: typing ? '1' : '0', seenupto: seen || '' }).catch(function () {});
+      }
+      function noteTyping() {
+        var now = Date.now();
+        if (!S.isTyping || now - S.typingSentAt > 3000) {
+          S.isTyping = true; S.typingSentAt = now;
+          sendState(true);
+        }
+        if (S.typingIdleTimer) clearTimeout(S.typingIdleTimer);
+        S.typingIdleTimer = setTimeout(stopTyping, 3000);
+      }
+      function stopTyping() {
+        if (S.typingIdleTimer) clearTimeout(S.typingIdleTimer);
+        if (S.isTyping) { S.isTyping = false; sendState(false); }
+      }
+      inputEl.addEventListener('input', function () { autoGrow(); noteTyping(); });
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && S.started) { sendState(S.isTyping); poll(); }
+      });
+
+      /* ---------------- polling ---------------- */
+      function poll() {
+        if (!S.started) return;
+        api({ action: 'poll', name: S.name, since: S.since }).then(function (res) {
+          if (!res) return;
+          if (res.error) {
+            if (res.error === 'bad_code') {
+              // passcode no longer accepted — send this device back to the gate
+              S.started = false;
+              localStorage.removeItem('ourchat_code');
+              S.code = '';
+              $('app').classList.add('hidden');
+              $('name-screen').classList.add('hidden');
+              $('gate-screen').classList.remove('hidden');
+              $('gate-err').textContent = 'That passcode is not right — try again.';
+            }
+            return;
+          }
+          var stick = nearBottom();
+          var hadNew = false;
+          var incoming = (res.messages || []).slice().sort(function (a, b) { return Number(a.id) - Number(b.id); });
+          incoming.forEach(function (m) {
+            m.id = Number(m.id); m.ts = Number(m.ts);
+            m.replyto = m.replyto === '' || m.replyto == null ? '' : Number(m.replyto);
+            m.reactions = m.reactions || {};
+            if (S.rows.has(m.id)) { applyUpdate({ id: m.id, reactions: m.reactions, deleted: m.deleted }); return; }
+            // a still-pending optimistic copy of my own message arriving via poll
+            if (m.name === S.name) {
+              var matched = null;
+              S.pending.forEach(function (p, tid) { if (matched === null && p.text === m.text) matched = tid; });
+              if (matched !== null) { confirmSent(matched, m.id); hadNew = true; return; }
+            }
+            addMessage(m, false);
+            hadNew = true;
+            if (m.id > S.since) S.since = m.id;
+          });
+          (res.updates || []).forEach(function (u) { u.id = Number(u.id); applyUpdate(u); });
+          S.other = res.other || {};
+          $('typing-row').classList.toggle('on', !!S.other.typing);
+          refreshHeader();
+          refreshSeen();
+          if (hadNew && stick) scrollBottom();
+          // report seen for partner messages now on screen
+          var seen = highestPartnerId();
+          if (!document.hidden && seen > S.lastSeenSent) sendState(S.isTyping);
+          else if (Date.now() - S.lastStateAt > 10000) sendState(S.isTyping);
+        }).catch(function () {});
+      }
+      setInterval(poll, 1500);
+      setInterval(refreshHeader, 20000);
+
+      /* ---------------- composer ---------------- */
+      function autoGrow() {
+        inputEl.style.height = 'auto';
+        inputEl.style.height = Math.min(inputEl.scrollHeight, 110) + 'px';
+      }
+      inputEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendCurrent(); }
+      });
+      $('send-btn').addEventListener('click', sendCurrent);
+
+      var panel = $('emoji-panel');
+      EMOJIS_PANEL.forEach(function (e) {
+        var b = document.createElement('button');
+        b.textContent = e; b.type = 'button';
+        b.addEventListener('click', function () {
+          var start = inputEl.selectionStart || inputEl.value.length;
+          var end = inputEl.selectionEnd || inputEl.value.length;
+          inputEl.value = inputEl.value.slice(0, start) + e + inputEl.value.slice(end);
+          inputEl.focus();
+          var pos = start + e.length;
+          try { inputEl.setSelectionRange(pos, pos); } catch (err) {}
+          autoGrow(); noteTyping();
+        });
+        panel.appendChild(b);
+      });
+      $('emoji-btn').addEventListener('click', function () { panel.classList.toggle('on'); });
+
+      /* ---------------- gate & name flow ---------------- */
+      function showChat() {
+        $('gate-screen').classList.add('hidden');
+        $('name-screen').classList.add('hidden');
+        $('app').classList.remove('hidden');
+        if (!S.started) {
+          S.started = true;
+          poll();
+          sendState(false);
+        }
+        setTimeout(function () { inputEl.focus(); }, 60);
+      }
+      function afterGate() {
+        if (S.name) showChat();
+        else {
+          $('gate-screen').classList.add('hidden');
+          $('name-screen').classList.remove('hidden');
+          setTimeout(function () { $('name-input').focus(); }, 60);
+        }
+      }
+      function tryGate(code, silent) {
+        S.code = code;
+        return api({ action: 'poll', name: S.name || 'guest', since: 0 }).then(function (res) {
+          if (res && !res.error) {
+            localStorage.setItem('ourchat_code', code);
+            return true;
+          }
+          if (!silent) {
+            $('gate-err').textContent = 'That passcode is not right — try again.';
+            $('gate-card').classList.remove('shake'); void $('gate-card').offsetWidth; $('gate-card').classList.add('shake');
+          }
+          return false;
+        }).catch(function () {
+          if (!silent) $('gate-err').textContent = 'Could not reach the chat — check your connection and try again.';
+          return false;
+        });
+      }
+      $('gate-go').addEventListener('click', function () {
+        var code = $('gate-code').value.trim();
+        if (code.length !== 4) { $('gate-err').textContent = 'Enter the 4-digit passcode.'; return; }
+        $('gate-go').disabled = true; $('gate-err').textContent = '';
+        tryGate(code, false).then(function (ok) {
+          $('gate-go').disabled = false;
+          if (ok) afterGate();
+        });
+      });
+      $('gate-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('gate-go').click(); });
+      $('gate-code').addEventListener('input', function () {
+        if ($('gate-code').value.trim().length === 4) $('gate-go').click();
+      });
+
+      $('name-go').addEventListener('click', function () {
+        var n = $('name-input').value.trim();
+        if (!n) { $('name-err').textContent = 'Please enter your name.'; return; }
+        S.name = n;
+        localStorage.setItem('ourchat_name', n);
+        showChat();
+      });
+      $('name-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('name-go').click(); });
+
+      /* ---------------- boot ---------------- */
+      if (S.code) {
+        $('gate-err').textContent = '';
+        tryGate(S.code, true).then(function (ok) { if (ok) afterGate(); });
+      }
+    </script>
+  </body>
+</html>
